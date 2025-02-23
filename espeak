@@ -1,0 +1,3 @@
+#!/bin/sh
+WIN=$(ip route show | grep -i default | awk '{ print $3}')
+nc -u $WIN 5000
