@@ -1,6 +1,8 @@
 import globalPluginHandler
 import socket
 import speech
+from speech.commands import BeepCommand, BreakCommand
+from characterProcessing import SymbolLevel
 import threading
 import tones
 import time
@@ -10,6 +12,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.q = []
+        self.symbol_level = None
         self.t = threading.Thread(target=self.run, daemon=True)
         self.t.start()
 
@@ -17,16 +20,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         return message[message.find("{") + 1 : message.find("}")]
 
     def process_queue(self):
+        cmds=[]
         for item in self.q:
             if item.startswith('q'):
-                speech.speakMessage(self.extract(item))
+                cmds.append(self.extract(item))
             elif item.startswith('t'):
                 words = item.split()
-                tones.beep(int(words[1]), int(words[2]))
+                cmds.append(BeepCommand(int(words[1]), int(words[2])))
             elif item.startswith('sh'):
                 words = item.split()
-                time.sleep(int(words[1])/1000)
+                cmds.append(BreakCommand(int(words[1])))
         self.q.clear()
+        speech.speak(cmds, symbolLevel = self.symbol_level)
 
     def run(self):
         buffer = ""
@@ -54,10 +59,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 speech.speakMessage(self.extract(message))
             case "l":
                 speech.speakSpelling(self.extract(message))
-            case "q" | "t":
+            case "q" | "t" | "sh":
                 self.q.append(message)
             case "s":
                 self.q.clear()
                 speech.cancelSpeech()
             case "d":
                 self.process_queue()
+            case "tts_set_punctuations":
+                match words[1]:
+                    case "none": self.symbol_level = SymbolLevel.NONE
+                    case "some": self.symbol_level = SymbolLevel.SOME
+                    case "all": self.symbol_level = SymbolLevel.ALL
+
